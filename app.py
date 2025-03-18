@@ -15,7 +15,7 @@ app = Flask(__name__)
 CORS(app, 
     resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000"],
+            "origins": ["https://bricklytics-frontend-382735415092.europe-southwest1.run.app"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Accept"],
             "supports_credentials": True
@@ -24,7 +24,7 @@ CORS(app,
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+    response.headers.add('Access-Control-Allow-Origin', 'https://bricklytics-frontend-382735415092.europe-southwest1.run.app')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Accept')
     response.headers.add('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
