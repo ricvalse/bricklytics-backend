@@ -34,10 +34,11 @@ app.secret_key = 'mysecretkey'
 
 # Configure session settings
 app.config.update(
-    SESSION_COOKIE_SECURE=True,  # Set to True in production (HTTPS)
+    SESSION_COOKIE_SECURE=True,  # Correct for HTTPS
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SAMESITE='None',  # Change from 'Lax' to 'None' for cross-site requests
     SESSION_COOKIE_PATH='/',
+    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain automatically
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
     SESSION_PERMANENT=True
 )
