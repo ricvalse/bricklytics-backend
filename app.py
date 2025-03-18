@@ -34,8 +34,8 @@ app.secret_key = 'mysecretkey'
 
 # Configure session settings
 app.config.update(
-    SESSION_COOKIE_SECURE=False,  # Set to True in production (HTTPS)
-    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,  # Set to True in production (HTTPS)
+    SESSION_COOKIE_HTTPONLY=False,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_PATH='/',
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
