@@ -321,7 +321,7 @@ def upload_data():
         try:
             df = pd.read_csv(csv_file)
             data = df.to_dict(orient="records")
-            results[table] = insert_into_bigquery(table, data)
+            results[table] = batch_load_to_bigquery(table, data)
         except Exception as e:
             results[table] = f"Error processing {csv_file}: {e}"
     
