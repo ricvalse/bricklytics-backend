@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend  # Set the working directory to backend
     
     steps:
     - uses: actions/checkout@v2
@@ -30,16 +33,26 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Run tests
-      run: |
-        export TESTING=True
-        pytest --cov=./ --cov-report=xml
       env:
-        GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+        TESTING: "True"
+        PYTHONPATH: ${{ github.workspace }}/backend
+        GOOGLE_APPLICATION_CREDENTIALS: ""
+      run: |
+        echo "Python version:"
+        python --version
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        python -m pytest --cov=./ --cov-report=xml
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: ./backend  # Set the working directory to backend
     
     steps:
     - uses: actions/checkout@v2
@@ -51,11 +64,11 @@ jobs:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
         export_default_credentials: true
     
-    - name: Build and Deploy to Cloud Run
+    - name: Deploy to Cloud Run
       run: |
         gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/bricklytics-backend
         gcloud run deploy bricklytics-backend \
           --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/bricklytics-backend \
           --platform managed \
           --region europe-southwest1 \
-          --allow-unauthenticated
+          --allow-unauthenticated 
