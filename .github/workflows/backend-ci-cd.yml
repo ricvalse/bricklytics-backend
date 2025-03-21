@@ -35,7 +35,17 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
         GOOGLE_APPLICATION_CREDENTIALS: ""
       run: |
-        python -m pytest --cov=./ --cov-report=xml
+        # Debug information
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Python path:"
+        echo $PYTHONPATH
+        echo "Test directory contents:"
+        ls -la tests/
+        # Run pytest with -v for verbose output and -s to see print statements
+        python -m pytest -v -s --cov=./ --cov-report=xml
 
   deploy:
     needs: test
