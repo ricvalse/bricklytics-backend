@@ -1,23 +1,33 @@
 import pytest
 import os
-from app import app
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from google.cloud import bigquery
 
-# Set testing environment
-os.environ['TESTING'] = 'True'
+# Mock BigQuery client before importing app
+mock_client = MagicMock()
+mock_client.project = "capstone-riccardo"
+
+with patch('google.cloud.bigquery.Client', return_value=mock_client):
+    from app import app
 
 @pytest.fixture
 def client():
     app.config['TESTING'] = True
     with app.test_client() as client:
-        with patch('app.query_bigquery') as mock_query:
-            # Mock data for different queries
-            mock_query.return_value = [
-                {'property_id': '1', 'address': '123 Test St', 'price': 100000},
-                {'property_id': '2', 'address': '456 Mock Ave', 'price': 300000}
-            ]
-            yield client
+        yield client
+
+@pytest.fixture(autouse=True)
+def mock_bigquery():
+    with patch('app.client', mock_client):
+        # Mock query results
+        mock_query_job = MagicMock()
+        mock_query_job.result.return_value = [
+            {'property_id': '1', 'address': '123 Test St', 'price': 100000},
+            {'property_id': '2', 'address': '456 Mock Ave', 'price': 200000}
+        ]
+        mock_client.query.return_value = mock_query_job
+        yield mock_client
 
 def test_get_properties(client):
     """Test getting properties endpoint"""
