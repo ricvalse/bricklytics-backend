@@ -698,3 +698,4 @@ def batch_load_to_bigquery(table_name, data):
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
 # Test CI/CD
+# Test CI/CD
