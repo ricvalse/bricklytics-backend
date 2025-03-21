@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import os
+import sys
 
-# Set up mock before any imports
+# Create mock before any imports
 mock_client = MagicMock()
 mock_client.project = "capstone-riccardo"
 mock_query_job = MagicMock()
@@ -12,5 +13,18 @@ mock_query_job.result.return_value = [
 ]
 mock_client.query.return_value = mock_query_job
 
-# Apply mock to google.cloud.bigquery.Client
-patch('google.cloud.bigquery.Client', return_value=mock_client).start() 
+# Mock the bigquery.Client before importing app
+with patch('google.cloud.bigquery.Client') as mock_bigquery:
+    mock_bigquery.return_value = mock_client
+    # Force the mock to be used when importing app
+    from google.cloud import bigquery
+    bigquery.Client = lambda project=None: mock_client
+
+# Now we can import app
+import app
+
+@pytest.fixture
+def client():
+    app.app.config['TESTING'] = True
+    with app.app.test_client() as client:
+        yield client 
