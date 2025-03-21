@@ -1,8 +1,24 @@
-# Ignore Python virtual environment
+# Virtual Environment
 .venv/
+venv/
+ENV/
 
-# Ignore Node.js dependencies
-frontend/node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+coverage.xml
 
-# Ignore environment variables
-.env
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+key.json
+*.pem
+*.key
+
+# OS
+.DS_Store
