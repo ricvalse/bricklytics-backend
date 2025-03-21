@@ -15,7 +15,7 @@ def client():
             # Mock data for different queries
             mock_query.return_value = [
                 {'property_id': '1', 'address': '123 Test St', 'price': 100000},
-                {'property_id': '2', 'address': '456 Mock Ave', 'price': 200000}
+                {'property_id': '2', 'address': '456 Mock Ave', 'price': 300000}
             ]
             yield client
 
