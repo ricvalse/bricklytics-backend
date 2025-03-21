@@ -66,9 +66,9 @@ jobs:
     
     - name: Deploy to Cloud Run
       run: |
-        gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/bricklytics-backend
-        gcloud run deploy bricklytics-backend \
-          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/bricklytics-backend \
+        gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend
+        gcloud run deploy backend \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend \
           --platform managed \
           --region europe-southwest1 \
           --allow-unauthenticated 
