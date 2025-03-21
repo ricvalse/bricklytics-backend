@@ -31,6 +31,7 @@ jobs:
     
     - name: Run tests
       run: |
+        export TESTING=True
         pytest --cov=./ --cov-report=xml
       env:
         GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}

@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import uuid  # Add this import
 import traceback
 from functools import wraps
+import os
 
 app = Flask(__name__)
 
@@ -43,12 +44,22 @@ app.config.update(
     SESSION_PERMANENT=True
 )
 
-# Initialize BigQuery client
-client = bigquery.Client(project="capstone-riccardo")
+# Initialize BigQuery client only if not testing
+if not os.getenv('TESTING'):
+    client = bigquery.Client(project="capstone-riccardo")
+else:
+    client = None
+
 DATASET_ID = "capstonedataset"
 
 # Function to execute queries in BigQuery
 def query_bigquery(query):
+    if os.getenv('TESTING'):
+        # Return mock data for testing
+        return [
+            {'property_id': '1', 'address': '123 Test St', 'price': 100000},
+            {'property_id': '2', 'address': '456 Mock Ave', 'price': 200000}
+        ]
     job = client.query(query)
     return [dict(row) for row in job.result()]
 
