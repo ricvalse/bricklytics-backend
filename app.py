@@ -12,7 +12,8 @@ from functools import wraps
 app = Flask(__name__)
 
 # Updated CORS configuration
-CORS(app, 
+CORS(app,
+    supports_credentials=True,  # Enable credentials at the app level
     resources={
         r"/api/*": {
             "origins": ["https://bricklytics-frontend-382735415092.europe-southwest1.run.app"],
@@ -41,18 +42,9 @@ def after_request(response):
     response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie, Authorization')
     response.headers.add('Access-Control-Max-Age', '3600')
     
-    # Ensure proper cookie settings for cross-origin
-    if 'Set-Cookie' in response.headers:
-        cookies = response.headers.getlist('Set-Cookie')
-        response.headers.remove('Set-Cookie')
-        for cookie in cookies:
-            if 'SameSite' not in cookie:
-                cookie += '; SameSite=None; Secure'
-            response.headers.add('Set-Cookie', cookie)
-    
     return response
 
-app.secret_key = 'mysecretkey'
+app.secret_key = 'mysecretkey'  # Change this to a strong secret key in production
 
 # Configure session settings
 app.config.update(
@@ -60,7 +52,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='None',
     SESSION_COOKIE_PATH='/',
-    SESSION_COOKIE_DOMAIN=None,
+    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     SESSION_PERMANENT=True,
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -431,6 +423,11 @@ def login():
 
         if check_password_hash(users[0]['password_hash'], data['password']):
             print("Password verified, setting up session")  # Debug print
+            
+            # Clear any existing session
+            session.clear()
+            
+            # Set up new session
             session.permanent = True
             session['user_id'] = users[0]['user_id']
             session['email'] = users[0]['email']
@@ -443,21 +440,8 @@ def login():
                 }
             }))
             
-            # Set session cookie
-            session_value = session.get('bricklytics_session', '')
-            if session_value:
-                response.set_cookie(
-                    'bricklytics_session',
-                    session_value,
-                    max_age=30 * 24 * 60 * 60,  # 30 days
-                    secure=True,
-                    httponly=True,
-                    samesite='None',
-                    path='/',
-                    domain=None
-                )
-            
-            print("Session after login:", dict(session))  # Debug print
+            # Let Flask handle the session cookie automatically
+            print("Session data being set:", dict(session))  # Debug print
             return response
         else:
             print("Invalid password")  # Debug print
@@ -475,7 +459,7 @@ def logout():
 
 @app.route('/api/check-auth', methods=['GET'])
 def check_auth():
-    print("Session contents:", dict(session))  # Debug print
+    print("Checking auth, session contents:", dict(session))  # Debug print
     if 'user_id' in session:
         try:
             query = f"""
