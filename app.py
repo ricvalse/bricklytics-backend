@@ -36,13 +36,14 @@ app.secret_key = 'mysecretkey'
 
 # Configure session settings
 app.config.update(
-    SESSION_COOKIE_SECURE=True,  # Correct for HTTPS
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='None',  # Change from 'Lax' to 'None' for cross-site requests
+    SESSION_COOKIE_SECURE=True,  # Required for HTTPS
+    SESSION_COOKIE_HTTPONLY=True,  # Prevents JavaScript access to session cookie
+    SESSION_COOKIE_SAMESITE='None',  # Required for cross-origin
     SESSION_COOKIE_PATH='/',
-    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain automatically
-    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-    SESSION_PERMANENT=True
+    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),  # Increased to 30 days
+    SESSION_PERMANENT=True,  # Make all sessions permanent by default
+    SESSION_REFRESH_EACH_REQUEST=True  # Refresh cookie expiry on each request
 )
 
 # Initialize BigQuery client
@@ -402,16 +403,28 @@ def login():
 
         if check_password_hash(users[0]['password_hash'], data['password']):
             print("Password verified, setting up session")  # Debug print
+            # Set session as permanent
             session.permanent = True
             session['user_id'] = users[0]['user_id']
+            session['email'] = users[0]['email']  # Store email for convenience
             
-            response = jsonify({
+            response = make_response(jsonify({
                 'message': 'Logged in successfully',
                 'user': {
                     'id': users[0]['user_id'],
                     'email': users[0]['email']
                 }
-            })
+            }))
+            
+            # Set additional cookie headers
+            response.set_cookie(
+                'session',
+                session.get('session'),
+                secure=True,
+                httponly=True,
+                samesite='None',
+                max_age=30 * 24 * 60 * 60  # 30 days in seconds
+            )
             
             print("Session after login:", dict(session))  # Debug print
             return response
