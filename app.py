@@ -18,7 +18,8 @@ CORS(app,
             "origins": ["https://bricklytics-frontend-382735415092.europe-southwest1.run.app"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Accept"],
-            "supports_credentials": True
+            "supports_credentials": True,
+            "expose_headers": ["Set-Cookie"]
         }
     })
 
@@ -28,6 +29,7 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Accept')
     response.headers.add('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
+    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
     return response
 
 app.secret_key = 'mysecretkey'
