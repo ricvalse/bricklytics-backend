@@ -5,15 +5,16 @@ from flask_cors import CORS
 import random
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
-import uuid  # Add this import
+import uuid
 import traceback
 from functools import wraps
+import os
 
 app = Flask(__name__)
 
 # Updated CORS configuration
 CORS(app,
-    supports_credentials=True,  # Enable credentials at the app level
+    supports_credentials=True,
     resources={
         r"/api/*": {
             "origins": ["https://bricklytics-frontend-382735415092.europe-southwest1.run.app"],
@@ -25,26 +26,8 @@ CORS(app,
         }
     })
 
-@app.after_request
-def after_request(response):
-    origin = "https://bricklytics-frontend-382735415092.europe-southwest1.run.app"
-    
-    # Handle preflight requests
-    if request.method == "OPTIONS":
-        response = make_response()
-        response.status_code = 200
-    
-    # Set CORS headers
-    response.headers.add('Access-Control-Allow-Origin', origin)
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Origin')
-    response.headers.add('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
-    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie, Authorization')
-    response.headers.add('Access-Control-Max-Age', '3600')
-    
-    return response
-
-app.secret_key = 'mysecretkey'  # Change this to a strong secret key in production
+# Strong secret key
+app.secret_key = os.urandom(24)
 
 # Configure session settings
 app.config.update(
@@ -52,11 +35,10 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='None',
     SESSION_COOKIE_PATH='/',
-    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain
+    SESSION_COOKIE_NAME='bricklytics_session',
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     SESSION_PERMANENT=True,
-    SESSION_REFRESH_EACH_REQUEST=True,
-    SESSION_COOKIE_NAME='bricklytics_session'
+    SESSION_REFRESH_EACH_REQUEST=True
 )
 
 # Initialize BigQuery client
@@ -393,19 +375,17 @@ def signup():
 
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
-    # Handle preflight requests
     if request.method == "OPTIONS":
         response = make_response()
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.status_code = 200
         return response
         
     try:
         data = request.get_json()
-        print("Login attempt with data:", data)  # Debug print
+        print("Login attempt with data:", data)
         
         if not data or 'email' not in data or 'password' not in data:
-            print("Missing email or password")  # Debug print
             return jsonify({'error': 'Missing email or password'}), 400
 
         query = f"""
@@ -413,25 +393,22 @@ def login():
             FROM `{client.project}.{DATASET_ID}.users`
             WHERE email = '{data['email']}'
         """
-        print("Executing query:", query)  # Debug print
         users = query_bigquery(query)
-        print("Query result:", users)  # Debug print
+        print("Query result:", users)
 
         if not users:
-            print("No user found")  # Debug print
             return jsonify({'error': 'Invalid credentials'}), 401
 
         if check_password_hash(users[0]['password_hash'], data['password']):
-            print("Password verified, setting up session")  # Debug print
-            
             # Clear any existing session
             session.clear()
             
-            # Set up new session
+            # Create new session data
             session.permanent = True
             session['user_id'] = users[0]['user_id']
             session['email'] = users[0]['email']
             
+            # Create response
             response = make_response(jsonify({
                 'message': 'Logged in successfully',
                 'user': {
@@ -440,28 +417,42 @@ def login():
                 }
             }))
             
-            # Let Flask handle the session cookie automatically
-            print("Session data being set:", dict(session))  # Debug print
+            # Explicitly set session cookie
+            cookie_value = session.get('bricklytics_session')
+            if cookie_value:
+                response.set_cookie(
+                    'bricklytics_session',
+                    cookie_value,
+                    max_age=30 * 24 * 60 * 60,  # 30 days
+                    secure=True,
+                    httponly=True,
+                    samesite='None',
+                    path='/'
+                )
+            
+            print("Final session state:", dict(session))
+            print("Response headers:", dict(response.headers))
             return response
         else:
-            print("Invalid password")  # Debug print
             return jsonify({'error': 'Invalid credentials'}), 401
-        
+            
     except Exception as e:
-        print("Login error details:", str(e))  # Debug print
-        print("Full traceback:", traceback.format_exc())  # Debug print
+        print("Login error details:", str(e))
+        print("Full traceback:", traceback.format_exc())
         return jsonify({'error': f'An error occurred during login: {str(e)}'}), 500
 
 @app.route('/api/logout')
 def logout():
     session.clear()
-    return jsonify({'message': 'Logged out successfully'})
+    response = make_response(jsonify({'message': 'Logged out successfully'}))
+    response.delete_cookie('bricklytics_session', path='/', samesite='None', secure=True)
+    return response
 
 @app.route('/api/check-auth', methods=['GET'])
 def check_auth():
-    print("Checking auth, session contents:", dict(session))  # Debug print
-    if 'user_id' in session:
-        try:
+    print("Checking auth, current session:", dict(session))
+    try:
+        if 'user_id' in session:
             query = f"""
                 SELECT user_id, email
                 FROM `{client.project}.{DATASET_ID}.users`
@@ -477,9 +468,10 @@ def check_auth():
                         'email': users[0]['email']
                     }
                 })
-        except Exception as e:
-            print("Check auth error:", str(e))
-            
+    except Exception as e:
+        print("Check auth error:", str(e))
+        print("Full traceback:", traceback.format_exc())
+    
     return jsonify({'authenticated': False}), 401
 
 @app.route("/api/users/<user_id>/owned-properties", methods=["GET"])
@@ -724,6 +716,29 @@ def batch_load_to_bigquery(table_name, data):
     except Exception as e:
         print(f"Error in batch load: {str(e)}")
         raise
+
+@app.after_request
+def after_request(response):
+    origin = "https://bricklytics-frontend-382735415092.europe-southwest1.run.app"
+    
+    # Set CORS headers
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, PUT, POST, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization, X-Requested-With, Origin'
+    response.headers['Access-Control-Expose-Headers'] = 'Set-Cookie, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    
+    # Ensure session cookie is set correctly for cross-origin
+    if 'Set-Cookie' in response.headers:
+        cookies = response.headers.getlist('Set-Cookie')
+        response.headers.pop('Set-Cookie')
+        for cookie in cookies:
+            if 'bricklytics_session' in cookie and 'SameSite=None' not in cookie:
+                cookie = f"{cookie}; SameSite=None; Secure"
+            response.headers.add('Set-Cookie', cookie)
+    
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
