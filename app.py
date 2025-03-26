@@ -416,15 +416,9 @@ def login():
                 }
             }))
             
-            # Set additional cookie headers
-            response.set_cookie(
-                'session',
-                session.get('session'),
-                secure=True,
-                httponly=True,
-                samesite='None',
-                max_age=30 * 24 * 60 * 60  # 30 days in seconds
-            )
+            # No need to manually set the session cookie - Flask handles this automatically
+            # Just ensure the response is configured correctly
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
             
             print("Session after login:", dict(session))  # Debug print
             return response
