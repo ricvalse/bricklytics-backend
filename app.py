@@ -17,33 +17,54 @@ CORS(app,
         r"/api/*": {
             "origins": ["https://bricklytics-frontend-382735415092.europe-southwest1.run.app"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Accept"],
+            "allow_headers": ["Content-Type", "Accept", "Authorization", "X-Requested-With", "Origin"],
             "supports_credentials": True,
-            "expose_headers": ["Set-Cookie"]
+            "expose_headers": ["Set-Cookie", "Authorization"],
+            "max_age": 3600
         }
     })
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://bricklytics-frontend-382735415092.europe-southwest1.run.app')
+    origin = "https://bricklytics-frontend-382735415092.europe-southwest1.run.app"
+    
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.status_code = 200
+    
+    # Set CORS headers
+    response.headers.add('Access-Control-Allow-Origin', origin)
     response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Accept')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Origin')
     response.headers.add('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
-    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
+    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie, Authorization')
+    response.headers.add('Access-Control-Max-Age', '3600')
+    
+    # Ensure proper cookie settings for cross-origin
+    if 'Set-Cookie' in response.headers:
+        cookies = response.headers.getlist('Set-Cookie')
+        response.headers.remove('Set-Cookie')
+        for cookie in cookies:
+            if 'SameSite' not in cookie:
+                cookie += '; SameSite=None; Secure'
+            response.headers.add('Set-Cookie', cookie)
+    
     return response
 
 app.secret_key = 'mysecretkey'
 
 # Configure session settings
 app.config.update(
-    SESSION_COOKIE_SECURE=True,  # Required for HTTPS
-    SESSION_COOKIE_HTTPONLY=True,  # Prevents JavaScript access to session cookie
-    SESSION_COOKIE_SAMESITE='None',  # Required for cross-origin
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='None',
     SESSION_COOKIE_PATH='/',
-    SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain
-    PERMANENT_SESSION_LIFETIME=timedelta(days=30),  # Increased to 30 days
-    SESSION_PERMANENT=True,  # Make all sessions permanent by default
-    SESSION_REFRESH_EACH_REQUEST=True  # Refresh cookie expiry on each request
+    SESSION_COOKIE_DOMAIN=None,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    SESSION_PERMANENT=True,
+    SESSION_REFRESH_EACH_REQUEST=True,
+    SESSION_COOKIE_NAME='bricklytics_session'
 )
 
 # Initialize BigQuery client
@@ -378,8 +399,15 @@ def signup():
         print("Server error:", str(e))  # Debug print
         return jsonify({'error': f'Server error occurred: {str(e)}'}), 500
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.status_code = 200
+        return response
+        
     try:
         data = request.get_json()
         print("Login attempt with data:", data)  # Debug print
@@ -403,10 +431,9 @@ def login():
 
         if check_password_hash(users[0]['password_hash'], data['password']):
             print("Password verified, setting up session")  # Debug print
-            # Set session as permanent
             session.permanent = True
             session['user_id'] = users[0]['user_id']
-            session['email'] = users[0]['email']  # Store email for convenience
+            session['email'] = users[0]['email']
             
             response = make_response(jsonify({
                 'message': 'Logged in successfully',
@@ -416,9 +443,19 @@ def login():
                 }
             }))
             
-            # No need to manually set the session cookie - Flask handles this automatically
-            # Just ensure the response is configured correctly
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            # Set session cookie
+            session_value = session.get('bricklytics_session', '')
+            if session_value:
+                response.set_cookie(
+                    'bricklytics_session',
+                    session_value,
+                    max_age=30 * 24 * 60 * 60,  # 30 days
+                    secure=True,
+                    httponly=True,
+                    samesite='None',
+                    path='/',
+                    domain=None
+                )
             
             print("Session after login:", dict(session))  # Debug print
             return response
